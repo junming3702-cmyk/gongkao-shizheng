@@ -1,0 +1,68 @@
+name: Deploy GitHub Pages fallback
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build static-compatible production bundle
+        run: pnpm build
+        env:
+          SKIP_CLOUDFLARE: "true"
+          GITHUB_PAGES: "true"
+      - name: Render homepage snapshot
+        shell: bash
+        run: |
+          mkdir -p _site
+          cp -R dist/client/. _site/
+          PORT=4173 SKIP_CLOUDFLARE=true GITHUB_PAGES=true node node_modules/vinext/dist/cli.js start > /tmp/site-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ --output _site/index.html; then
+              break
+            fi
+            sleep 1
+          done
+          test -s _site/index.html || { cat /tmp/site-server.log; exit 1; }
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -35,6 +35,31 @@ export default function Home() {
     const form = event.currentTarget;
     const fields = new FormData(form);
 
+    // GitHub Pages is the public fallback when chatgpt.site is unavailable.
+    // It has no server runtime, so suggestions become pre-filled GitHub issues.
+    if (window.location.hostname.endsWith("github.io")) {
+      const type = String(fields.get("type") || "建议");
+      const title = String(fields.get("title") || "");
+      const content = String(fields.get("content") || "");
+      const sourceUrl = String(fields.get("sourceUrl") || "");
+      const contact = String(fields.get("contact") || "");
+      const body = [
+        `提交类型：${type}`,
+        "",
+        "具体内容：",
+        content,
+        sourceUrl ? `\n资料来源：${sourceUrl}` : "",
+        contact ? `\n联系方式：${contact}` : "",
+      ].filter(Boolean).join("\n");
+      const issueUrl = new URL("https://github.com/junming3702-cmyk/gongkao-shizheng/issues/new");
+      issueUrl.searchParams.set("title", `[${type}] ${title}`);
+      issueUrl.searchParams.set("body", body);
+      window.open(issueUrl.toString(), "_blank", "noopener,noreferrer");
+      setSuggestStatus("已打开 GitHub 建议页面，确认后即可提交。");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/suggestions", {
         method: "POST",

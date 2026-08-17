@@ -41,6 +41,7 @@ export default defineConfig(async () => {
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
   const skipCloudflare = process.env.SKIP_CLOUDFLARE === "true";
+  const githubPages = process.env.GITHUB_PAGES === "true";
   const plugins = [vinext(), sites()];
 
   // Local source builds can skip the Wrangler runtime when its native
@@ -56,6 +57,7 @@ export default defineConfig(async () => {
   }
 
   return {
+    base: githubPages ? "/gongkao-shizheng/" : "/",
     build: skipCloudflare
       ? { rolldownOptions: { external: ["cloudflare:workers"] } }
       : undefined,
