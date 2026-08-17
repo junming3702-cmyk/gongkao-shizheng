@@ -40,11 +40,12 @@ export default defineConfig(async () => {
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
+  const skipCloudflare = process.env.SKIP_CLOUDFLARE === "true";
   const plugins = [vinext(), sites()];
 
   // Local source builds can skip the Wrangler runtime when its native
   // workerd binary is unavailable. Sites hosting still uses the full plugin.
-  if (process.env.SKIP_CLOUDFLARE !== "true") {
+  if (!skipCloudflare) {
     const { cloudflare } = await import("@cloudflare/vite-plugin");
     plugins.push(
       cloudflare({
@@ -55,6 +56,9 @@ export default defineConfig(async () => {
   }
 
   return {
+    build: skipCloudflare
+      ? { rolldownOptions: { external: ["cloudflare:workers"] } }
+      : undefined,
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
